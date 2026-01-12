@@ -26,10 +26,34 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: {
     template: "%s | NexPit",
-    default: "NexPit",
+    default: "NexPit - Newsletter Tech et Web",
   },
+  description: "Inscris-toi à la newsletter Nexpit pour recevoir les dernières astuces tech et web directement dans ta boîte mail.",
+  keywords: ["newsletter", "tech", "web", "astuces", "Nexpit", "actualité numérique", "développement", "programmation", "tutoriel", "code", "JavaScript", "React", "TypeScript", "frontend", "backend", "automobile", "NexPit", "NexPit Newsletter", "Voiture", "Tech News", "Web Development", "Coding Tips", "Programming", "Software", "Gadgets", "Innovation", "Digital Trends", "Tech Tips", "Web Design", "App Development"],
+  authors: [{ name: "Nexpit" }],
+  creator: "Nexpit",
+  publisher: "Nexpit",
   icons: {
     icon: "/NexPit_N.svg",
+  },
+  openGraph: {
+    title: "Nexpit - Newsletter Tech et Web",
+    description: "Reçois les dernières astuces tech et web directement dans ta boîte mail.",
+    url: "https://www.nexpit.fr/",
+    type: "website",
+    siteName: "Nexpit",
+    locale: "fr_FR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nexpit - Newsletter Tech et Web",
+    description: "Reçois les dernières astuces tech et web directement dans ta boîte mail.",
+    site: "@nexpit",
+    creator: "@nexpit",
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 }
 
