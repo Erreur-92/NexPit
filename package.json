@@ -13,6 +13,7 @@
     "@radix-ui/react-icons": "latest",
     "@radix-ui/react-label": "latest",
     "@radix-ui/react-slot": "latest",
+    "@vercel/analytics": "^1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "latest",

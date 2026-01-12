@@ -40,11 +40,6 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={cn(geistSans.variable, geistMono.variable, instrumentSerif.variable)}>
-        <Script
-          defer
-          src="https://analytics.derrien.tech/script.js"
-          data-website-id="3264c3df-abf9-4563-a2ca-264f1da40dd0"
-        />
         {children}
       </body>
     </html>
