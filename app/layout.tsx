@@ -4,6 +4,7 @@ import Script from "next/script"
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
+import { Analytics } from "@vercel/analytics/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className={cn(geistSans.variable, geistMono.variable, instrumentSerif.variable)}>
         {children}
+        <Analytics />
       </body>
     </html>
   )
