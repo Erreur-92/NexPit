@@ -65,7 +65,7 @@ export const Newsletter = () => {
                 input={(props) => (
                   /* @ts-expect-error - Type mismatch */
                   <motion.input
-                    autoCapitalize="off"
+                    autoCapitalize="none"
                     autoComplete="email"
                     placeholder="Enter your email"
                     className={inputVariants()}
