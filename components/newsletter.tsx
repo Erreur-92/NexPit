@@ -67,7 +67,7 @@ export const Newsletter = () => {
                   <motion.input
                     autoCapitalize="none"
                     autoComplete="email"
-                    placeholder="Enter your email"
+                    placeholder="Entrez votre email"
                     className={inputVariants()}
                     initial={isInitialRender.current ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
