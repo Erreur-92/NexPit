@@ -398,7 +398,16 @@ Mesures relevées sur le build de production, en local :
 | Mobile | 96–98 | 100 | 100 | 100 | 2,4–2,8 s | 0 |
 
 Le LCP mobile est mesuré sous le bridage simulé de Lighthouse (1,6 Mbit/s,
-processeur ralenti 4×), pas sur un vrai téléphone en 4G.
+processeur ralenti 4×), pas sur un vrai téléphone en 4G. La cible « LCP sous
+1,5 s » est tenue en desktop ; sous ce profil mobile synthétique elle ne l'est
+pas, et c'est le seul objectif chiffré du cahier des charges qui ne le soit pas.
+
+Poids d'une page, en gzip : 199 Ko de JavaScript, 20 Ko de CSS, 71 Ko de
+polices. Le JavaScript est presque intégralement le socle React 19 et le
+routeur Next : le code applicatif de la page d'accueil tient en 13 Ko, et les
+pages projet comme les pages légales n'embarquent aucun composant client.
+`next start` ne sert qu'en gzip ; derrière un reverse proxy avec brotli, compter
+environ 170 Ko.
 
 axe-core ne relève aucune violation WCAG 2.1 AA sur onze pages en 390 px et
 1440 px. Aucun débordement horizontal de 360 à 2560 px.
