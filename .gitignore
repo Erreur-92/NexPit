@@ -18,6 +18,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -27,3 +28,8 @@ yarn-error.log*
 next-env.d.ts
 
 .DS_Store
+# données applicatives (inscriptions, rendez-vous) — jamais versionnées
+/.data/
+
+# environnement python résiduel de l'ancien projet
+/venv/
