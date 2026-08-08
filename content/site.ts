@@ -28,7 +28,7 @@ export const site = {
   //   pour un éditeur personne physique. Un numéro secondaire ou VoIP convient ;
   //   ce n'est pas nécessairement votre portable personnel.
   //   Exemple :  phone: "+33 6 12 34 56 78" as Maybe<string>,
-  phone: PENDING as Maybe<string>,
+  phone: "+33 6 82 80 87 97" as Maybe<string>,
 
   social: {
     instagram: "https://www.instagram.com/nexpit.eu",
