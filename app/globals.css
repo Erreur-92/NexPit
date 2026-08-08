@@ -166,9 +166,15 @@
   /* Le rail : filet vertical à ticks qui longe la page comme la marge
      graduée d'une planche. Purement décoratif, donc masqué aux lecteurs
      d'écran et absent sous 1024px. */
+  /* `max` et non `var(--rail)` seul : `.railed` accompagne toujours `.shell`,
+     et comme il est déclaré après lui dans la même couche, un simple
+     `padding-left: var(--rail)` écrasait la marge du shell. Sous 1024px le rail
+     vaut 0, ce qui collait le contenu au bord de l'écran sur toutes les pages.
+     Au-dessus, le rail reste plus large que la marge courante et l'emporte,
+     donc l'affichage sur grand écran est inchangé. */
   .railed {
     position: relative;
-    padding-left: var(--rail);
+    padding-left: max(var(--page-pad), var(--rail));
   }
 
   .rail {
