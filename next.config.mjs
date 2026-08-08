@@ -12,6 +12,14 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
+  // La route /api/og lit ses polices via un chemin construit à l'exécution
+  // (`path.join(process.cwd(), …)`), que l'analyse statique de Next ne peut pas
+  // suivre. Sans cette déclaration, les .ttf ne sont pas empaquetés dans la
+  // fonction et la route échoue en production alors qu'elle passe en local.
+  outputFileTracingIncludes: {
+    "/api/og": ["./assets/fonts/**"],
+  },
+
   async redirects() {
     return [
       // La racine renvoie vers le français ; l'anglais reste accessible en direct.

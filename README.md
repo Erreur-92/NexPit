@@ -59,7 +59,7 @@ Tout est décrit dans `.env.example`, à copier en `.env.local`. Les indispensab
 | `SMTP_FROM` | Adresse d'expédition | Retombe sur `SMTP_USER` |
 | `CONTACT_NOTIFY_TO` | Boîte interne qui reçoit les demandes | Retombe sur l'adresse historique |
 | `CRON_SECRET` | Protège la route des rappels | La route répond 503, aucun rappel n'est envoyé |
-| `DATA_DIR` | Où vit le fichier de données | `<projet>/.data` |
+| `DATABASE_URL` | Base PostgreSQL (inscriptions, rendez-vous) | Le stockage refuse de démarrer |
 
 En développement, mettre `NEXT_PUBLIC_SITE_URL=http://localhost:3000` : sinon les
 liens de confirmation reçus par email pointent vers la production.
@@ -284,18 +284,20 @@ soit quelques écritures par semaine. Une base relationnelle ajouterait une
 dépendance native à la chaîne de déploiement pour un volume qui tient dans
 quelques kilo-octets.
 
-**Deux limites à connaître :**
+Le document vit dans une ligne `jsonb` d'une table `store`, créée au premier
+accès. Chaque écriture prend un verrou consultatif transactionnel
+(`pg_advisory_xact_lock`) avant de lire : entre la lecture et la réécriture,
+aucune autre instance ne peut s'intercaler. C'est ce qui permet de vérifier une
+disponibilité et d'écrire dans le même souffle — deux visiteurs qui valident le
+même créneau ne peuvent pas réserver tous les deux.
 
-1. Le verrou est interne au processus. Le site doit tourner en **une seule
-   instance Node** — c'est le cas d'un `next start` derrière un reverse proxy,
-   pas d'un déploiement en fonctions sans état.
-2. Le système de fichiers doit être **persistant**. Sur un hébergement
-   conteneurisé, monter un volume et pointer `DATA_DIR` dessus.
+Le verrou étant tenu par le serveur de base et non par le processus, **le site
+peut tourner en plusieurs instances**, ce qu'impose un hébergement en fonctions.
 
-Pour passer à PostgreSQL, il n'y a que `lib/store.ts` à réécrire : l'interface
-exposée tient en deux fonctions, `mutate` et `query`.
+Préférer l'adresse groupée (« pooled ») fournie par l'hébergeur : le verrou est
+transactionnel, donc compatible avec un pooler en mode transaction.
 
-Sauvegarde : le fichier `$DATA_DIR/nexpit.json` suffit.
+Sauvegarde : celle de la base. `SELECT data FROM store;` suffit à tout exporter.
 
 ---
 
@@ -313,13 +315,31 @@ Toutes les heures suffit. La route est idempotente : un rendez-vous déjà rappe
 n'est pas repris, l'appeler dix fois n'envoie pas dix emails. Si l'envoi échoue,
 le rappel est rouvert pour la passe suivante.
 
-Trois façons de la brancher, toutes gratuites :
+Quatre façons de la brancher, toutes gratuites :
 
+- **le cron Vercel**, déclaré dans `vercel.json` (voir ci-dessous)
 - **cron système** sur le serveur : `0 * * * * curl -sS -H "Authorization: Bearer …" …`
 - **le planificateur de l'hébergeur** (Coolify, Dokploy et Railway en ont un)
 - **un service de cron gratuit** type cron-job.org, si le serveur n'a pas de cron
 
 Sans `CRON_SECRET`, la route répond 503 et le signale dans les journaux.
+
+### Sur Vercel
+
+`vercel.json` déclare une passe quotidienne à 8 h UTC. L'en-tête `Authorization`
+attendu par la route est ajouté automatiquement à partir de `CRON_SECRET`, il n'y
+a rien à écrire.
+
+Une passe par jour suffit, et ce n'est pas un compromis : la fenêtre d'envoi de
+la route va de 6 h à 30 h avant le rendez-vous, soit **24 h de large**, c'est-à-dire
+exactement la période du cron. Les fenêtres des passes successives pavent donc la
+ligne du temps sans trou ni recouvrement, et chaque rendez-vous tombe dans une
+et une seule d'entre elles. La contrepartie est la précision : le rappel part
+entre 6 et 30 h à l'avance selon l'heure du créneau, au lieu d'environ 24 h.
+
+Le plan Hobby **refuse** une expression plus fréquente — le déploiement échoue,
+il ne dégrade pas silencieusement. Pour resserrer le délai, passer à `0 * * * *`
+demande un plan Pro.
 
 ---
 
@@ -424,7 +444,7 @@ l'installation, le build et le démarrage.
 1. `pnpm check:content --strict` doit passer — sinon les mentions légales sont
    incomplètes, ce qui est une infraction, pas un détail cosmétique.
 2. Renseigner toutes les variables de `.env.example` côté hébergeur.
-3. Monter un volume persistant et pointer `DATA_DIR` dessus.
+3. Provisionner la base et renseigner `DATABASE_URL`.
 4. Brancher la route des rappels (section 9).
 5. Vérifier que `NEXT_PUBLIC_SITE_URL` vaut bien l'URL publique : les liens de
    confirmation et d'annulation en dépendent.
@@ -435,6 +455,7 @@ Pour afficher le repère de révision dans le cartouche du pied de page :
 NEXT_PUBLIC_BUILD_REV=$(git rev-parse --short HEAD) pnpm build
 ```
 
-**Si vous déployez sur une plateforme en fonctions sans état** (Vercel et
-assimilés), le stockage fichier ne tiendra pas : remplacer `lib/store.ts` par un
-adaptateur PostgreSQL avant de basculer.
+**Sur une plateforme en fonctions sans état** (Vercel et assimilés), la
+planification des rappels passe par le cron de l'hébergeur : `vercel.json`
+déclare l'appel horaire à `/api/cron/reminders`, et l'en-tête `Authorization`
+attendu par la route est ajouté automatiquement à partir de `CRON_SECRET`.

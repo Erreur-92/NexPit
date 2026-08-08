@@ -1,24 +1,29 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { Pool, type PoolClient } from "pg";
 import type { Locale } from "@/content/types";
 
 /**
  * Stockage.
  *
- * Un fichier JSON, écrit de façon atomique, sérialisé par une file d'attente
- * en mémoire. Ce choix est délibéré : le site enregistre des inscriptions à
- * une lettre d'information et des rendez-vous, soit quelques écritures par
- * semaine. Une base relationnelle ajouterait une dépendance native à la chaîne
- * de déploiement pour un volume qui tient dans un fichier de quelques kilo-octets.
+ * Un document JSON unique, gardé dans Postgres, lu et réécrit sous verrou.
+ * Ce choix reste celui d'origine — le site enregistre des inscriptions à une
+ * lettre d'information et des rendez-vous, soit quelques écritures par semaine,
+ * un volume qui tient dans quelques kilo-octets — mais il corrige les deux
+ * limites que la version sur fichier assumait :
  *
- * Deux limites, assumées et documentées dans le README :
+ * - Le verrou n'est plus interne au processus. `pg_advisory_xact_lock` est pris
+ *   par le serveur de base, donc deux instances de l'application qui écrivent
+ *   à la même seconde s'attendent l'une l'autre. Le site peut tourner en
+ *   plusieurs exemplaires, ce qu'impose un hébergement en fonctions.
+ * - La persistance ne dépend plus du système de fichiers, qui est éphémère sur
+ *   ce type d'hébergement.
  *
- * - Le verrou est interne au processus. Le site doit tourner en une seule
- *   instance Node. C'est le cas d'un déploiement classique (`next start`
- *   derrière un reverse proxy), pas d'un déploiement en fonctions sans état.
- * - Le système de fichiers doit être persistant. Sur une plateforme au
- *   système de fichiers éphémère, il faut remplacer ce module : l'interface
- *   exposée plus bas tient en six fonctions.
+ * Le verrou est *transactionnel* : il est relâché par COMMIT ou ROLLBACK, sans
+ * rien à libérer à la main. C'est aussi le seul type de verrou consultatif qui
+ * survive à un pooler en mode transaction, ce qui laisse le choix d'utiliser
+ * l'adresse groupée de l'hébergeur.
+ *
+ * L'interface exposée plus bas est inchangée : `mutate` et `query`. Aucun des
+ * appelants n'a eu à bouger.
  */
 
 export type SubscriberStatus = "pending" | "confirmed";
@@ -65,57 +70,150 @@ type Data = {
 
 const EMPTY: Data = { subscribers: [], bookings: [] };
 
-const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), ".data");
-const DATA_FILE = path.join(DATA_DIR, "nexpit.json");
+/**
+ * Clé du verrou. Arbitraire, mais fixe : toutes les instances doivent demander
+ * le même entier pour que le verrou les sérialise entre elles.
+ */
+const LOCK_KEY = 4_021_197;
 
-/** File d'attente : toute opération passe par ici, jamais deux en parallèle. */
-let queue: Promise<unknown> = Promise.resolve();
+/** Identifiant de l'unique ligne du document. */
+const ROW_ID = 1;
 
-function serialize<T>(op: () => Promise<T>): Promise<T> {
-  const run = queue.then(op, op);
-  // La file ne doit jamais rester en état rejeté, sinon toute écriture
-  // ultérieure échouerait pour la faute d'une précédente.
-  queue = run.catch(() => undefined);
-  return run;
+let pool: Pool | undefined;
+
+/**
+ * Initialisation paresseuse. Next évalue le code de premier niveau des modules
+ * pendant le build : construire la connexion à l'import ferait échouer
+ * `next build` tant que `DATABASE_URL` n'est pas encore renseignée.
+ */
+function getPool(): Pool {
+  if (pool) return pool;
+
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL absente : le stockage ne peut pas démarrer. " +
+        "Voir .env.example.",
+    );
+  }
+
+  pool = new Pool({
+    connectionString: url,
+    // L'hébergement réutilise les instances entre requêtes, mais leur nombre
+    // n'est pas borné : quelques connexions par instance suffisent et évitent
+    // d'épuiser le quota de la base.
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    // Postgres géré : TLS obligatoire, certificat émis par une autorité
+    // publique. En développement local sur une base sans TLS, on n'impose rien.
+    ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: true },
+  });
+
+  return pool;
 }
 
-async function readData(): Promise<Data> {
+let ready: Promise<void> | undefined;
+
+/**
+ * Création de la table au premier accès. Idempotent, et pris sous verrou pour
+ * que deux instances qui démarrent ensemble ne jouent pas le DDL en même temps.
+ */
+function ensureSchema(): Promise<void> {
+  ready ??= (async () => {
+    const client = await getPool().connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1)", [LOCK_KEY]);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS store (
+          id         integer PRIMARY KEY,
+          data       jsonb   NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await client.query(
+        "INSERT INTO store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+        [ROW_ID, JSON.stringify(EMPTY)],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      // Une initialisation ratée ne doit pas être mémorisée : la tentative
+      // suivante doit pouvoir réessayer plutôt que d'hériter de l'échec.
+      ready = undefined;
+      throw err;
+    } finally {
+      client.release();
+    }
+  })();
+
+  return ready;
+}
+
+function parse(raw: unknown): Data {
+  const parsed = (raw ?? {}) as Partial<Data>;
+  return {
+    subscribers: parsed.subscribers ?? [],
+    bookings: parsed.bookings ?? [],
+  };
+}
+
+async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await getPool().connect();
   try {
-    const raw = await fs.readFile(DATA_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<Data>;
-    return {
-      subscribers: parsed.subscribers ?? [],
-      bookings: parsed.bookings ?? [],
-    };
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") return { ...EMPTY };
-    // Un fichier illisible ou corrompu doit remonter : l'écraser silencieusement
-    // reviendrait à perdre les rendez-vous déjà pris.
-    throw err;
+    return await fn(client);
+  } finally {
+    client.release();
   }
 }
 
-async function writeData(data: Data): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const tmp = `${DATA_FILE}.${process.pid}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  // rename est atomique sur le même système de fichiers : à aucun instant le
-  // fichier de données n'existe à l'état partiel.
-  await fs.rename(tmp, DATA_FILE);
-}
-
-/** Lit, transforme et réécrit en une seule opération non interrompue. */
+/**
+ * Lit, transforme et réécrit en une seule opération non interrompue.
+ *
+ * Le verrou est demandé avant la lecture : entre le SELECT et l'UPDATE, aucune
+ * autre instance ne peut s'intercaler. C'est ce qui permet aux appelants de
+ * vérifier une disponibilité et d'écrire dans le même souffle — deux visiteurs
+ * qui valident le même créneau ne peuvent pas réserver tous les deux.
+ */
 export function mutate<T>(fn: (data: Data) => T | Promise<T>): Promise<T> {
-  return serialize(async () => {
-    const data = await readData();
-    const result = await fn(data);
-    await writeData(data);
-    return result;
+  return withClient(async (client) => {
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1)", [LOCK_KEY]);
+
+      const res = await client.query<{ data: unknown }>(
+        "SELECT data FROM store WHERE id = $1",
+        [ROW_ID],
+      );
+      const data = parse(res.rows[0]?.data);
+
+      const result = await fn(data);
+
+      await client.query(
+        "UPDATE store SET data = $1, updated_at = now() WHERE id = $2",
+        [JSON.stringify(data), ROW_ID],
+      );
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    }
   });
 }
 
-/** Lecture seule, sans réécriture. */
+/**
+ * Lecture seule, sans réécriture et sans verrou : Postgres sert un instantané
+ * cohérent, et rien ici n'a besoin de bloquer une écriture concurrente.
+ */
 export function query<T>(fn: (data: Data) => T): Promise<T> {
-  return serialize(async () => fn(await readData()));
+  return withClient(async (client) => {
+    const res = await client.query<{ data: unknown }>(
+      "SELECT data FROM store WHERE id = $1",
+      [ROW_ID],
+    );
+    return fn(parse(res.rows[0]?.data));
+  });
 }
