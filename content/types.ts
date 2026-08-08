@@ -46,16 +46,28 @@ export function tx(value: string | I18n, locale: Locale): string {
 export const PENDING = "__A_COMPLETER__" as const;
 export type Pending = typeof PENDING;
 
-/** Une valeur que NexPit doit encore fournir. */
-export type Maybe<T> = T | Pending;
+/**
+ * Champ qui ne s'applique pas à la structure choisie — un capital social pour
+ * une entreprise individuelle, par exemple. Distinct de PENDING : il n'y a
+ * rien à attendre, donc `check:content` n'a pas à le réclamer.
+ */
+export const SANS_OBJET = "__SANS_OBJET__" as const;
+export type SansObjet = typeof SANS_OBJET;
+
+/** Une valeur que NexPit doit encore fournir, ou qui ne le concerne pas. */
+export type Maybe<T> = T | Pending | SansObjet;
 
 export function isPending<T>(value: Maybe<T>): value is Pending {
   return value === PENDING;
 }
 
-/** Renvoie la valeur, ou `null` si elle n'a pas encore été fournie. */
+export function isSansObjet<T>(value: Maybe<T>): value is SansObjet {
+  return value === SANS_OBJET;
+}
+
+/** Renvoie la valeur, ou `null` si elle manque ou ne s'applique pas. */
 export function resolve<T>(value: Maybe<T>): T | null {
-  return isPending(value) ? null : (value as T);
+  return isPending(value) || isSansObjet(value) ? null : (value as T);
 }
 
 /** Ne garde que les entrées réellement renseignées. */
@@ -158,6 +170,8 @@ export type TeamMember = {
 export type LegalIdentity = {
   readonly legalName: Maybe<string>;
   readonly legalForm: Maybe<I18n>;
+  /** Numéro au répertoire national des associations, format W puis 9 chiffres. */
+  readonly rna: Maybe<string>;
   readonly siret: Maybe<string>;
   readonly ape: Maybe<string>;
   readonly vat: Maybe<string>;

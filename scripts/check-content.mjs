@@ -26,23 +26,27 @@ const BLOCKING = new Set([
   "legalName",
   "legalForm",
   "siret",
+  "ape",
+  "vat",
   "address",
   "publicationDirector",
+  "phone",
   "host",
 ]);
 
 const EXPLAIN = {
-  legalName: "Raison sociale exacte",
+  legalName: "Dénomination exacte, avec la mention EI si micro-entreprise",
+  rna: "Numéro RNA (W + 9 chiffres), sur le récépissé de déclaration",
   legalForm: "Forme juridique (micro-entreprise, SASU, …)",
-  siret: "Numéro SIRET",
+  siret: "Numéro SIRET, 14 chiffres",
   ape: "Code APE",
   vat: "Numéro de TVA intracommunautaire (ou franchise en base)",
   shareCapital: "Capital social, si société",
-  address: "Adresse du siège rendue publique",
+  address: "Adresse du siège social, rendue publique",
   publicationDirector: "Directeur de la publication",
-  registrationCity: "Ville d'immatriculation (RCS ou RM)",
+  registrationCity: "Préfecture de déclaration et date",
   host: "Nom et adresse de l'hébergeur",
-  phone: "Téléphone public, si vous en voulez un",
+  phone: "Téléphone public de l'association",
   founded: "Mois et année de création de NexPit",
   team: "Noms, rôles et parcours de l'équipe",
   headcount: "Nombre de personnes dans la structure",
@@ -65,7 +69,14 @@ for (const file of walk(contentDir)) {
   const rel = path.relative(root, file);
   const lines = readFileSync(file, "utf8").split("\n");
 
+  // La variante associative est un jeu de rechange, pas un formulaire à
+  // remplir : on ne la compte pas tant qu'elle n'est pas celle qui sert.
+  let inSpare = false;
+
   lines.forEach((line, i) => {
+    if (/^export const legalIdentityAssociation/.test(line)) inSpare = true;
+    else if (/^export const |^};$/.test(line) && inSpare && /^};$/.test(line)) inSpare = false;
+    if (inSpare) return;
     if (!/\bPENDING\b/.test(line)) return;
 
     // On ne retient qu'une affectation réelle : `  siret: PENDING,` ou

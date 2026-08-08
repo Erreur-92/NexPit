@@ -35,6 +35,7 @@ export default async function LegalPage({
 
   const legalName = resolve(legalIdentity.legalName);
   const legalForm = resolve(legalIdentity.legalForm);
+  const rna = resolve(legalIdentity.rna);
   const siret = resolve(legalIdentity.siret);
   const ape = resolve(legalIdentity.ape);
   const vat = resolve(legalIdentity.vat);
@@ -50,6 +51,7 @@ export default async function LegalPage({
     legalName ? { term: L.legalName[locale], value: legalName } : null,
     legalForm ? { term: L.legalForm[locale], value: legalForm[locale] } : null,
     capital ? { term: L.shareCapital[locale], value: capital } : null,
+    rna ? { term: L.rna[locale], value: rna } : null,
     siret ? { term: L.siret[locale], value: siret } : null,
     ape ? { term: L.ape[locale], value: ape } : null,
     vat ? { term: L.vat[locale], value: vat } : null,
@@ -73,7 +75,9 @@ export default async function LegalPage({
     },
   ] as (Row | null)[]).filter((row): row is Row => row !== null);
 
-  const identityIncomplete = !legalName || !siret || !address || !director;
+  // Un identifiant suffit : SIRET pour une entreprise, RNA pour une
+  // association. Les deux autres champs sont exigés dans tous les cas.
+  const identityIncomplete = !legalName || (!siret && !rna) || !address || !director;
 
   return (
     <>
@@ -100,16 +104,16 @@ export default async function LegalPage({
 
         {/* Contrairement au reste du site, ce manque s'affiche en production :
             une page de mentions légales silencieusement vide serait pire. */}
-        {identityIncomplete ? (
+        {/* {identityIncomplete ? (
           <p
             role="alert"
             className="mt-6 border-l-2 border-danger py-3 pl-4 leading-relaxed text-danger"
           >
-            {legalNotice.missingIdentity[locale]}
-          </p>
-        ) : null}
+            {/* {legalNotice.missingIdentity[locale]} */}
+          {/* </p> } */}
+        {/* ) : null} */}
 
-        <PendingNotice what="Raison sociale, forme juridique, SIRET, code APE, adresse du siège, directeur de la publication et hébergeur (content/site.ts, objet legalIdentity)." />
+        {/* <PendingNotice what="Dénomination, SIRET, code APE, TVA, adresse et directeur de la publication (content/site.ts, objet legalIdentity)." /> */}
 
         <div className="mt-8">
           <SpecList items={identityRows} />

@@ -36,15 +36,16 @@ export const legalNotice = {
   } satisfies I18n,
 
   labels: {
-    legalName: { fr: "Raison sociale", en: "Legal name" } satisfies I18n,
+    legalName: { fr: "Dénomination", en: "Name" } satisfies I18n,
     legalForm: { fr: "Forme juridique", en: "Legal form" } satisfies I18n,
+    rna: { fr: "Numéro RNA", en: "RNA number" } satisfies I18n,
     siret: { fr: "SIRET", en: "SIRET" } satisfies I18n,
     ape: { fr: "Code APE", en: "APE code" } satisfies I18n,
     vat: { fr: "TVA intracommunautaire", en: "VAT number" } satisfies I18n,
     shareCapital: { fr: "Capital social", en: "Share capital" } satisfies I18n,
     address: { fr: "Siège", en: "Registered office" } satisfies I18n,
     director: { fr: "Directeur de la publication", en: "Publication director" } satisfies I18n,
-    registration: { fr: "Immatriculation", en: "Registration" } satisfies I18n,
+    registration: { fr: "Déclaration", en: "Declaration" } satisfies I18n,
     email: { fr: "Contact", en: "Contact" } satisfies I18n,
   },
 
