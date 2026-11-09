@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PendingNotice } from "@/components/pending-notice";
@@ -79,29 +80,42 @@ export default async function AboutPage({
         <h2 className="display d2">{about.teamHeading[locale]}</h2>
 
         {team ? (
-          <ul className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-10 grid gap-3">
             {team.map((member, i) => {
               const name = resolve(member.name);
-              const role = resolve(member.role);
-              const bio = resolve(member.bio);
-              const linkedin = resolve(member.linkedin);
+              const portfolio = resolve(member.portfolio);
+              const preview = resolve(member.preview);
               if (!name) return null;
 
-              return (
-                <li key={i} className="border-t border-ink pt-5">
-                  <h3 className="display d3">{name}</h3>
-                  {role ? <p className="label mt-2">{role[locale]}</p> : null}
-                  {bio ? <p className="mt-4 text-[0.9375rem] text-ink-2">{bio[locale]}</p> : null}
-                  {linkedin ? (
-                    <a
-                      href={linkedin}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="label mt-4 inline-block hover:text-ink transition-colors"
-                    >
-                      LinkedIn
-                    </a>
+              const banner = (
+                <>
+                  {preview ? (
+                    <Image
+                      src={preview}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1280px) 1280px, 100vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
                   ) : null}
+                  <span className="absolute inset-0 bg-black/65 transition-colors duration-300 group-hover:bg-black/45" />
+                  <span className="relative flex h-full items-end justify-between gap-4 p-6 sm:p-8">
+                    <span className="display d2 text-white">{name}</span>
+                    {portfolio ? <span className="label shrink-0 text-white/80">Portfolio ↗</span> : null}
+                  </span>
+                </>
+              );
+              const box = "group relative block h-40 overflow-hidden bg-black sm:h-56";
+
+              return (
+                <li key={i}>
+                  {portfolio ? (
+                    <a href={portfolio} target="_blank" rel="noreferrer noopener" className={box}>
+                      {banner}
+                    </a>
+                  ) : (
+                    <div className={box}>{banner}</div>
+                  )}
                 </li>
               );
             })}

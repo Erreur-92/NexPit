@@ -165,6 +165,9 @@ export type TeamMember = {
   readonly bio: Maybe<I18n>;
   readonly photo: Maybe<string>;
   readonly linkedin: Maybe<string>;
+  readonly portfolio: Maybe<string>;
+  /** Capture du portfolio, sous public/. Fond du bandeau. */
+  readonly preview: Maybe<string>;
 };
 
 export type LegalIdentity = {

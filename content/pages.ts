@@ -142,15 +142,39 @@ export const about = {
   },
 
   teamHeading: { fr: "L'équipe", en: "The team" } satisfies I18n,
-  /**
-   * Non renseigné : la page n'affiche aucune fiche tant que NexPit n'a pas
-   * fourni les noms, rôles et parcours réels. Une équipe inventée est la
-   * chose la plus vite repérée sur un site d'ingénierie.
-   */
-  team: PENDING as Maybe<readonly TeamMember[]>,
+  /** Rôles et parcours restent PENDING tant que NexPit ne les a pas fournis. */
+  team: [
+    {
+      name: "Evan Verplaetse",
+      role: PENDING,
+      bio: PENDING,
+      photo: PENDING,
+      linkedin: PENDING,
+      portfolio: "https://evn-web.vercel.app",
+      preview: "/team/evan.png",
+    },
+    {
+      name: "Titouan Beaurepaire",
+      role: PENDING,
+      bio: PENDING,
+      photo: PENDING,
+      linkedin: PENDING,
+      portfolio: "https://titouanbeaurepaire.fr",
+      preview: "/team/titouan.png",
+    },
+    {
+      name: "Matéo-Enzo Perrot",
+      role: PENDING,
+      bio: PENDING,
+      photo: PENDING,
+      linkedin: PENDING,
+      portfolio: "https://mateo-perrot.fr",
+      preview: "/team/mateo.png",
+    },
+  ] as Maybe<readonly TeamMember[]>,
 
   /** Nombre de personnes dans la structure. Change le « nous » en « je ». */
-  headcount: PENDING as Maybe<number>,
+  headcount: 3 as Maybe<number>,
 } as const;
 
 /* ========================================================================== */
